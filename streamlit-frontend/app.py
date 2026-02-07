@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Local logo (fallback to included SVG file)
+LOGO_PATH = "fcx_logo.svg"
+
 # Page configuration
 st.set_page_config(
     page_title="Inventory Dashboard",
@@ -29,6 +32,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Sidebar configuration
+try:
+    st.sidebar.image(LOGO_PATH, width=72)
+except Exception:
+    # ignore if logo missing
+    pass
 st.sidebar.title("⚙️ Settings")
 backend_url = st.sidebar.text_input(
     "Backend URL",
@@ -36,9 +44,16 @@ backend_url = st.sidebar.text_input(
     help="URL of the backend API"
 )
 
-# Main title
-st.title("📦 Inventory Dashboard")
-st.markdown("Real-time inventory tracking and analytics")
+# Main header (logo + title)
+col_logo, col_title = st.columns([1, 8])
+with col_logo:
+    try:
+        st.image(LOGO_PATH, width=96)
+    except Exception:
+        pass
+with col_title:
+    st.title("📦 Inventory Dashboard")
+    st.markdown("Real-time inventory tracking and analytics")
 
 # Sample data (replace with actual API calls)
 @st.cache_data
@@ -158,25 +173,53 @@ with tab2:
 
 # Tab 3: Management
 with tab3:
-    st.subheader("Inventory Table")
-    
-    # Display editable dataframe
-    edited_df = st.data_editor(
-        inventory_df[["Product Name", "Current Stock", "Min Stock", "Max Stock", "Category"]],
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("💾 Save Changes", use_container_width=True):
-            st.success("Changes saved successfully!")
-    
-    with col2:
-        if st.button("🔄 Refresh Data", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+    st.subheader("AI Analytics Assistant")
+
+    # Top layout: assistant card (left) + quick metrics (right)
+    left, right = st.columns([3, 1])
+
+    with left:
+        st.markdown("""
+        **Ask questions about your ingredient usage, inventory levels, or get predictions.**
+
+        Example prompts: "What ingredients are running low?", "Predict tomato usage next week"
+        """)
+
+        # Large input area for queries
+        user_query = st.text_area("Your question", value="", height=120, placeholder="Type a question for the AI analytics assistant...")
+
+        col_a, col_b = st.columns([1, 3])
+        with col_a:
+            analyze = st.button("Analyze")
+        with col_b:
+            st.write("")
+
+        if analyze and user_query.strip():
+            # placeholder for analysis action
+            with st.spinner("Analyzing..."):
+                st.info("(This would call the backend/AI service and display results here)")
+
+        st.markdown("---")
+        st.subheader("Inventory Table")
+        # Keep editable dataframe below the assistant
+        edited_df = st.data_editor(
+            inventory_df[["Product Name", "Current Stock", "Min Stock", "Max Stock", "Category"]],
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with right:
+        st.subheader("Quick Metrics")
+        st.metric("Total Items", inventory_df["Current Stock"].sum())
+        st.metric("Low Stock Items", len(inventory_df[inventory_df["Current Stock"] < inventory_df["Min Stock"]]))
+        st.metric("Categories", inventory_df["Category"].nunique())
+
+        st.markdown("---")
+        st.subheader("Actions")
+        if st.button("Add Inventory"):
+            st.success("Add inventory flow would open here")
+        if st.button("Run Reorder"):
+            st.success("Reorder process triggered (placeholder)")
 
 # Footer
 st.divider()
