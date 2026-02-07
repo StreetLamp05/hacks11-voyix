@@ -41,6 +41,7 @@ def create_app():
     from .routes.dashboard import dashboard_bp
     from .routes.menu import menu_bp
     from .routes.batches import batches_bp
+    from .routes.nl2sql import nl2sql_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(restaurants_bp)
@@ -50,5 +51,6 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(menu_bp)
     app.register_blueprint(batches_bp)
+    app.register_blueprint(nl2sql_bp)
 
     return app
