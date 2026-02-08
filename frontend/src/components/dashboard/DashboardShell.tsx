@@ -35,7 +35,7 @@ interface DashboardShellProps {
 
 type DashboardTab = "dashboard" | "inventory" | "menu" | "calendar";
 
-const NAV_ITEMS: { key: DashboardTab; label: string; icon: () => JSX.Element }[] = [
+const NAV_ITEMS: { key: DashboardTab; label: string; icon: () => React.JSX.Element }[] = [
   { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
   { key: "inventory", label: "Inventory", icon: InventoryIcon },
   { key: "menu", label: "Menu", icon: MenuIcon },
