@@ -30,6 +30,8 @@ interface DashboardShellProps {
   restaurantName: string;
 }
 
+type DashboardTab = "dashboard" | "inventory";
+
 function sizeToSpans(size: WidgetSize): { colSpan: number; rowSpan: number } {
   const [c, r] = size.split("x").map(Number);
   return { colSpan: c, rowSpan: r };
@@ -128,6 +130,7 @@ export default function DashboardShell({
   restaurantId,
   restaurantName,
 }: DashboardShellProps) {
+  const [activeTab, setActiveTab] = useState<DashboardTab>("dashboard");
   const {
     visibleWidgetIds,
     toggleWidget,
@@ -293,4 +296,19 @@ export default function DashboardShell({
       )}
     </>
   );
+}
+
+function sideTabStyle(active: boolean): React.CSSProperties {
+  return {
+    width: "100%",
+    textAlign: "left",
+    border: "none",
+    borderRadius: 8,
+    padding: "0.5rem 0.6rem",
+    fontSize: "0.85rem",
+    fontWeight: active ? 600 : 500,
+    background: active ? "var(--btn-bg)" : "transparent",
+    color: active ? "var(--btn-color)" : "var(--foreground)",
+    cursor: "pointer",
+  };
 }
