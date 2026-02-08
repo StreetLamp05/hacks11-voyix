@@ -1,6 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+// Web Speech API types (not in all TS lib configs)
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  [index: number]: SpeechRecognitionAlternative;
+}
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance;
+}
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { askQuestion, isError, NL2SQLResponse } from "@/lib/nl2sql";
 import {
   askClaude,
@@ -8,11 +46,14 @@ import {
   addQwenContext,
   buildExplainPrompt,
   fetchSimplePredictions,
+  classifyIntent,
+  executeAction,
   DEFAULT_PROMPT_TEMPLATE,
 } from "@/lib/claude";
+import type { ActionIntent } from "@/lib/claude";
 import ResultsTable from "./ResultsTable";
 
-type Stage = "idle" | "optimizing" | "qwen" | "explaining" | "done" | "error";
+type Stage = "idle" | "classifying" | "optimizing" | "qwen" | "explaining" | "acting" | "done" | "error";
 
 type Exchange = {
   question: string;
@@ -37,7 +78,77 @@ export default function NL2SQLModal({
   const [showSettings, setShowSettings] = useState(false);
   const [promptTemplate, setPromptTemplate] = useState(DEFAULT_PROMPT_TEMPLATE);
   const messagesEnd = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Voice-to-text via Web Speech API
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setListening(false);
+  }, []);
+
+  const startListening = useCallback(() => {
+    const SpeechRecognitionCtor =
+      window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    let finalTranscript = "";
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      setInput(finalTranscript + interim);
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+      if (finalTranscript) {
+        setInput(finalTranscript);
+      }
+    };
+
+    recognition.onerror = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }, []);
+
+  // Clean up recognition on unmount
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  // Auto-resize textarea when input changes (e.g. from speech recognition)
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [input]);
 
   // Load prompt template from localStorage
   useEffect(() => {
@@ -62,64 +173,90 @@ export default function NL2SQLModal({
   }, [open]);
 
   const busy = exchanges.some(
-    (e) => e.stage === "optimizing" || e.stage === "qwen" || e.stage === "explaining"
+    (e) => e.stage === "classifying" || e.stage === "optimizing" || e.stage === "qwen" || e.stage === "explaining" || e.stage === "acting"
   );
 
   async function handleSend() {
+    if (listening) stopListening();
     const q = input.trim();
     if (!q || busy) return;
     setInput("");
 
     const idx = exchanges.length;
-    const newExchange: Exchange = { question: q, stage: "optimizing" };
+    const newExchange: Exchange = { question: q, stage: "classifying" };
     setExchanges((prev) => [...prev, newExchange]);
 
     try {
-      // Stage 1: Claude optimizes the question for Qwen
-      const optimizerPrompt = buildOptimizerPrompt(q);
-      const optimized = (await askClaude(optimizerPrompt)).trim();
-      setExchanges((prev) =>
-        prev.map((e, i) =>
-          i === idx ? { ...e, optimizedQuestion: optimized, stage: "qwen" } : e
-        )
-      );
+      // Stage 1: Classify intent — query or action?
+      const intent = await classifyIntent(q);
 
-      // Stage 2: NL2SQL via Qwen + fetch simple predictions in parallel
-      const [nl2sqlRes, simplePreds] = await Promise.all([
-        askQuestion(addQwenContext(optimized)),
-        fetchSimplePredictions(),
-      ]);
-      setExchanges((prev) =>
-        prev.map((e, i) =>
-          i === idx ? { ...e, nl2sqlResponse: nl2sqlRes } : e
-        )
-      );
-
-      // Stage 3: Claude explains results (if no SQL error)
-      if (!isError(nl2sqlRes)) {
+      if (intent.type === "action") {
+        // --- ACTION PATH: execute via REST API ---
         setExchanges((prev) =>
           prev.map((e, i) =>
-            i === idx ? { ...e, stage: "explaining" } : e
+            i === idx ? { ...e, stage: "acting" } : e
           )
         );
-        const explainPrompt = buildExplainPrompt(
-          promptTemplate,
-          q,
-          nl2sqlRes.results,
-          simplePreds
-        );
-        const claudeText = await askClaude(explainPrompt);
+
+        const result = await executeAction(intent as ActionIntent);
         setExchanges((prev) =>
           prev.map((e, i) =>
-            i === idx
-              ? { ...e, claudeResponse: claudeText, stage: "done" }
-              : e
+            i === idx ? { ...e, claudeResponse: result, stage: "done" } : e
           )
         );
       } else {
+        // --- QUERY PATH: existing NL2SQL pipeline ---
+        // Stage 2: Claude optimizes the question for Qwen
         setExchanges((prev) =>
-          prev.map((e, i) => (i === idx ? { ...e, stage: "done" } : e))
+          prev.map((e, i) =>
+            i === idx ? { ...e, stage: "optimizing" } : e
+          )
         );
+        const optimizerPrompt = buildOptimizerPrompt(q);
+        const optimized = (await askClaude(optimizerPrompt)).trim();
+        setExchanges((prev) =>
+          prev.map((e, i) =>
+            i === idx ? { ...e, optimizedQuestion: optimized, stage: "qwen" } : e
+          )
+        );
+
+        // Stage 3: NL2SQL via Qwen + fetch simple predictions in parallel
+        const [nl2sqlRes, simplePreds] = await Promise.all([
+          askQuestion(addQwenContext(optimized)),
+          fetchSimplePredictions(),
+        ]);
+        setExchanges((prev) =>
+          prev.map((e, i) =>
+            i === idx ? { ...e, nl2sqlResponse: nl2sqlRes } : e
+          )
+        );
+
+        // Stage 4: Claude explains results (if no SQL error)
+        if (!isError(nl2sqlRes)) {
+          setExchanges((prev) =>
+            prev.map((e, i) =>
+              i === idx ? { ...e, stage: "explaining" } : e
+            )
+          );
+          const explainPrompt = buildExplainPrompt(
+            promptTemplate,
+            q,
+            nl2sqlRes.results,
+            simplePreds
+          );
+          const claudeText = await askClaude(explainPrompt);
+          setExchanges((prev) =>
+            prev.map((e, i) =>
+              i === idx
+                ? { ...e, claudeResponse: claudeText, stage: "done" }
+                : e
+            )
+          );
+        } else {
+          setExchanges((prev) =>
+            prev.map((e, i) => (i === idx ? { ...e, stage: "done" } : e))
+          );
+        }
       }
     } catch (err) {
       setExchanges((prev) =>
@@ -202,15 +339,19 @@ export default function NL2SQLModal({
               <div style={styles.userBubble}>{ex.question}</div>
 
               {/* Stage indicator */}
-              {(ex.stage === "optimizing" || ex.stage === "qwen" || ex.stage === "explaining") && (
+              {(ex.stage === "classifying" || ex.stage === "optimizing" || ex.stage === "qwen" || ex.stage === "explaining" || ex.stage === "acting") && (
                 <div style={styles.stageIndicator}>
                   <span style={styles.spinner} />
                   <span style={{ fontSize: "0.8rem", color: "var(--chart-text)" }}>
-                    {ex.stage === "optimizing"
-                      ? "Optimizing question with Claude..."
-                      : ex.stage === "qwen"
-                        ? "Converting to SQL via Qwen-2.5-code..."
-                        : "Interpreting results with Claude..."}
+                    {ex.stage === "classifying"
+                      ? "Understanding your request..."
+                      : ex.stage === "acting"
+                        ? "Executing action..."
+                        : ex.stage === "optimizing"
+                          ? "Optimizing question with Claude..."
+                          : ex.stage === "qwen"
+                            ? "Converting to SQL via Qwen-2.5-code..."
+                            : "Interpreting results with Claude..."}
                   </span>
                 </div>
               )}
@@ -279,15 +420,37 @@ export default function NL2SQLModal({
 
         {/* Input bar */}
         <div style={styles.inputBar}>
-          <input
+          <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Ask about your inventory..."
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder={listening ? "Listening..." : "Ask about your inventory..."}
             disabled={busy}
-            style={{ ...styles.input, flex: 1 }}
+            rows={1}
+            style={{ ...styles.input, flex: 1, resize: "none", overflow: "hidden" }}
           />
+          <button
+            onClick={listening ? stopListening : startListening}
+            disabled={busy}
+            title={listening ? "Stop listening" : "Voice input"}
+            style={{
+              ...styles.micBtn,
+              background: listening ? "var(--color-danger)" : "transparent",
+              color: listening ? "#fff" : "var(--foreground)",
+            }}
+          >
+            {listening ? "\u25A0" : "\uD83C\uDF99"}
+          </button>
           <button
             onClick={handleSend}
             disabled={busy || !input.trim()}
@@ -444,6 +607,19 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--foreground)",
     fontSize: "0.85rem",
     outline: "none",
+  },
+  micBtn: {
+    border: "1px solid var(--chart-grid)",
+    borderRadius: "50%",
+    width: 32,
+    height: 32,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "0.9rem",
+    cursor: "pointer",
+    flexShrink: 0,
+    transition: "background 0.15s, color 0.15s",
   },
   sendBtn: {
     background: "var(--btn-bg)",

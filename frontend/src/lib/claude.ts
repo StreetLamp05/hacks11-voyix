@@ -1,4 +1,13 @@
 import { apiUrl } from "./api";
+import {
+  fetchIngredientCatalog,
+  createIngredient as apiCreateIngredient,
+  createMenuItem as apiCreateMenuItem,
+  addMenuItemIngredient,
+  fetchMenu,
+  deleteMenuItem as apiDeleteMenuItem,
+  restockInventoryIngredient,
+} from "./dashboard-api";
 
 // Full schema + business logic context derived from migrations/001–003 and backend services
 const DB_CONTEXT = `
@@ -286,4 +295,165 @@ export function buildExplainPrompt(
   }
 
   return prompt;
+}
+
+// ---------- Intent classification for write operations ----------
+
+export type QueryIntent = { type: "query" };
+export type ActionIntent = {
+  type: "action";
+  action: "add_menu_item" | "restock" | "add_ingredient" | "delete_menu_item";
+  params: Record<string, unknown>;
+  confirmation: string;
+};
+export type Intent = QueryIntent | ActionIntent;
+
+const INTENT_PROMPT = `You are an intent classifier for "The Corner Bistro" restaurant inventory system.
+
+Given a user message, determine if it is:
+- A QUERY: a read-only question about data (stock levels, predictions, menu info, usage trends, etc.)
+- An ACTION: a request to create, update, or delete something
+
+Supported actions:
+1. "add_menu_item" — Create a new menu item, optionally with ingredient links
+   params: { "item_name": string, "price": number, "ingredients": [{"name": string, "qty_per_item": number}] }
+2. "restock" — Record receiving a shipment/delivery of an ingredient
+   params: { "ingredient_name": string, "qty": number }
+3. "add_ingredient" — Add a new ingredient to the catalog
+   params: { "ingredient_name": string, "unit": string, "category": string|null, "unit_cost": number|null, "shelf_life_days": number|null }
+4. "delete_menu_item" — Remove a menu item
+   params: { "item_name": string }
+
+Rules:
+- Respond with ONLY a JSON object, no other text
+- For queries: {"type": "query"}
+- For actions: {"type": "action", "action": "<name>", "params": {...}, "confirmation": "<short description of what will be done>"}
+- If price is not given for a menu item, estimate a reasonable price for a bistro
+- If qty_per_item is not given for an ingredient in a menu item, default to 1.0
+- If unit is not given for a new ingredient, infer it (g, ml, each, lb, oz, bunch, etc.)
+- "shipment of 300 butter" or "received 300 butter" → restock with ingredient_name="Butter", qty=300
+- If intent is ambiguous, default to "query"
+
+User message: "{question}"`;
+
+export async function classifyIntent(question: string): Promise<Intent> {
+  const prompt = INTENT_PROMPT.replace("{question}", question);
+  const text = await askClaude(prompt);
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return { type: "query" };
+  try {
+    const parsed = JSON.parse(match[0]);
+    if (parsed.type === "action" && parsed.action && parsed.params) {
+      return parsed as ActionIntent;
+    }
+    return { type: "query" };
+  } catch {
+    return { type: "query" };
+  }
+}
+
+export async function executeAction(intent: ActionIntent): Promise<string> {
+  const restaurantId = 1;
+
+  switch (intent.action) {
+    case "add_menu_item": {
+      const { item_name, price, ingredients } = intent.params as {
+        item_name: string;
+        price: number;
+        ingredients?: { name: string; qty_per_item: number }[];
+      };
+
+      const menuItem = await apiCreateMenuItem(restaurantId, { item_name, price });
+      let msg = `Created menu item "${menuItem.item_name}" ($${menuItem.price})`;
+
+      if (ingredients && ingredients.length > 0) {
+        const catalog = await fetchIngredientCatalog();
+        const linked: string[] = [];
+        const notFound: string[] = [];
+
+        for (const ing of ingredients) {
+          const found = catalog.find(
+            (c) => c.ingredient_name.toLowerCase() === ing.name.toLowerCase()
+          );
+          if (found) {
+            await addMenuItemIngredient(menuItem.menu_item_id, {
+              ingredient_id: found.ingredient_id,
+              qty_per_item: ing.qty_per_item,
+            });
+            linked.push(`${found.ingredient_name} (${ing.qty_per_item} ${found.unit})`);
+          } else {
+            notFound.push(ing.name);
+          }
+        }
+
+        if (linked.length > 0) msg += ` with ingredients: ${linked.join(", ")}`;
+        if (notFound.length > 0)
+          msg += `\n\nCouldn't find these ingredients in the catalog: ${notFound.join(", ")}. Add them in the Inventory table first.`;
+      }
+
+      return msg;
+    }
+
+    case "restock": {
+      const { ingredient_name, qty } = intent.params as {
+        ingredient_name: string;
+        qty: number;
+      };
+
+      const catalog = await fetchIngredientCatalog();
+      const found = catalog.find(
+        (c) => c.ingredient_name.toLowerCase() === ingredient_name.toLowerCase()
+      );
+
+      if (!found) {
+        return `Couldn't find ingredient "${ingredient_name}" in the catalog. Check the Inventory table for exact names.`;
+      }
+
+      const result = await restockInventoryIngredient(restaurantId, found.ingredient_id, {
+        restock_qty: qty,
+      });
+
+      return `Restocked ${qty} ${found.unit} of ${found.ingredient_name}. New stock level: ${result.inventory_end} ${found.unit}.`;
+    }
+
+    case "add_ingredient": {
+      const { ingredient_name, unit, category, unit_cost, shelf_life_days } =
+        intent.params as {
+          ingredient_name: string;
+          unit: string;
+          category?: string | null;
+          unit_cost?: number | null;
+          shelf_life_days?: number | null;
+        };
+
+      const created = await apiCreateIngredient({
+        ingredient_name,
+        unit,
+        category: category ?? undefined,
+        unit_cost: unit_cost ?? undefined,
+        shelf_life_days: shelf_life_days ?? undefined,
+      });
+
+      return `Created ingredient "${created.ingredient_name}" (unit: ${created.unit}, category: ${created.category ?? "none"}).`;
+    }
+
+    case "delete_menu_item": {
+      const { item_name } = intent.params as { item_name: string };
+
+      const menu = await fetchMenu(restaurantId);
+      const found = menu.find(
+        (m) => m.item_name.toLowerCase() === item_name.toLowerCase()
+      );
+
+      if (!found) {
+        return `Couldn't find menu item "${item_name}". Check the Menu table for exact names.`;
+      }
+
+      await apiDeleteMenuItem(found.menu_item_id);
+      return `Deleted menu item "${found.item_name}" from the menu.`;
+    }
+
+    default:
+      return `Unknown action: ${intent.action}. I can add menu items, restock ingredients, add new ingredients, or delete menu items.`;
+  }
 }
