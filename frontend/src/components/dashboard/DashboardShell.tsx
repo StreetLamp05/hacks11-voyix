@@ -24,6 +24,9 @@ import { WIDGET_MAP } from "@/lib/constants/widget-registry";
 import type { WidgetId, WidgetSize } from "@/lib/types/dashboard";
 import DashboardCard from "./DashboardCard";
 import WidgetPickerModal from "./WidgetPickerModal";
+import InventoryTableView from "./InventoryTableView";
+import MenuTableView from "./MenuTableView";
+import TrafficCalendarView from "./TrafficCalendarView";
 
 interface DashboardShellProps {
   restaurantId: number;
@@ -31,6 +34,13 @@ interface DashboardShellProps {
 }
 
 type DashboardTab = "dashboard" | "inventory" | "menu" | "calendar";
+
+const NAV_ITEMS: { key: DashboardTab; label: string }[] = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "inventory", label: "Inventory" },
+  { key: "menu", label: "Menu" },
+  { key: "calendar", label: "Calendar" },
+];
 
 function sizeToSpans(size: WidgetSize): { colSpan: number; rowSpan: number } {
   const [c, r] = size.split("x").map(Number);
@@ -192,114 +202,204 @@ export default function DashboardShell({
     justifyContent: "center",
   };
 
-  return (
-    <>
-      <div style={{ padding: "1rem", paddingBottom: "6rem", maxWidth: 1400, margin: "0 auto" }}>
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: "1.75rem", fontWeight: 700, margin: 0 }}>
-              {restaurantName}
-            </h1>
-            <p style={{ color: "var(--chart-text)", margin: "0.25rem 0 0", fontSize: "0.85rem" }}>
-              Dashboard
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            {/* Widget picker */}
-            <button
-              onClick={() => setIsPickerOpen(true)}
-              aria-label="Choose widgets"
-              title="Choose widgets"
-              style={iconBtnStyle}
-            >
-              <GridIcon />
-            </button>
-
-            {/* Drag mode toggle */}
-            <button
-              onClick={() => setIsDragMode((d) => !d)}
-              aria-label={isDragMode ? "Done rearranging" : "Rearrange widgets"}
-              title={isDragMode ? "Done rearranging" : "Rearrange widgets"}
-              style={{
-                ...iconBtnStyle,
-                background: isDragMode ? "var(--color-success)" : "var(--btn-bg)",
-              }}
-            >
-              <MoveIcon />
-            </button>
-            <button onClick={() => setActiveTab("menu")} style={sideTabStyle(activeTab === "menu")}>
-              Menu
-            </button>
-            <button onClick={() => setActiveTab("calendar")} style={sideTabStyle(activeTab === "calendar")}>
-              Calendar
-            </button>
-          </div>
-        </div>
-
-        {/* Grid */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
-        >
-          <SortableContext
-            items={visibleWidgetIds}
-            strategy={rectSortingStrategy}
-          >
+  const renderContent = () => {
+    switch (activeTab) {
+      case "inventory":
+        return <InventoryTableView restaurantId={restaurantId} />;
+      case "menu":
+        return <MenuTableView restaurantId={restaurantId} />;
+      case "calendar":
+        return <TrafficCalendarView restaurantId={restaurantId} />;
+      default:
+        return (
+          <>
+            {/* Dashboard header controls */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fill, minmax(max(160px, calc(20% - 1rem)), 1fr))",
-                gridAutoRows: 180,
-                gap: "1rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.5rem",
               }}
             >
-              {visibleWidgetIds.map((id) => (
-                <SortableWidget
-                  key={id}
-                  widgetId={id}
-                  restaurantId={restaurantId}
-                  isDragMode={isDragMode}
-                  isBeingDragged={id === activeId}
-                  isDropTarget={id === overId && overId !== activeId}
-                />
-              ))}
+              <div>
+                <h1 style={{ fontSize: "1.75rem", fontWeight: 700, margin: 0 }}>
+                  {restaurantName}
+                </h1>
+                <p style={{ color: "var(--chart-text)", margin: "0.25rem 0 0", fontSize: "0.85rem" }}>
+                  Dashboard
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <button
+                  onClick={() => setIsPickerOpen(true)}
+                  aria-label="Choose widgets"
+                  title="Choose widgets"
+                  style={iconBtnStyle}
+                >
+                  <GridIcon />
+                </button>
+                <button
+                  onClick={() => setIsDragMode((d) => !d)}
+                  aria-label={isDragMode ? "Done rearranging" : "Rearrange widgets"}
+                  title={isDragMode ? "Done rearranging" : "Rearrange widgets"}
+                  style={{
+                    ...iconBtnStyle,
+                    background: isDragMode ? "var(--color-success)" : "var(--btn-bg)",
+                  }}
+                >
+                  <MoveIcon />
+                </button>
+              </div>
             </div>
-          </SortableContext>
 
-          <DragOverlay dropAnimation={null}>
-            {activeId ? (
-              <DragOverlayCard
-                widgetId={activeId}
-                restaurantId={restaurantId}
+            {/* Widget grid */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+            >
+              <SortableContext
+                items={visibleWidgetIds}
+                strategy={rectSortingStrategy}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(max(160px, calc(20% - 1rem)), 1fr))",
+                    gridAutoRows: 180,
+                    gap: "1rem",
+                  }}
+                >
+                  {visibleWidgetIds.map((id) => (
+                    <SortableWidget
+                      key={id}
+                      widgetId={id}
+                      restaurantId={restaurantId}
+                      isDragMode={isDragMode}
+                      isBeingDragged={id === activeId}
+                      isDropTarget={id === overId && overId !== activeId}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+
+              <DragOverlay dropAnimation={null}>
+                {activeId ? (
+                  <DragOverlayCard
+                    widgetId={activeId}
+                    restaurantId={restaurantId}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+
+            {isPickerOpen && (
+              <WidgetPickerModal
+                visibleWidgetIds={visibleWidgetIds}
+                onToggle={toggleWidget}
+                onReset={resetLayout}
+                onClose={() => setIsPickerOpen(false)}
               />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      </div>
+            )}
+          </>
+        );
+    }
+  };
 
-      {/* Widget picker modal */}
-      {isPickerOpen && (
-        <WidgetPickerModal
-          visibleWidgetIds={visibleWidgetIds}
-          onToggle={toggleWidget}
-          onReset={resetLayout}
-          onClose={() => setIsPickerOpen(false)}
-        />
-      )}
+  return (
+    <>
+      <style>{`
+        .dashboard-layout {
+          display: flex;
+          min-height: 0;
+        }
+        .dashboard-sidebar {
+          position: sticky;
+          top: 0;
+          width: 200px;
+          min-width: 200px;
+          height: 100vh;
+          padding: 1rem 0.75rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+          background: var(--card-bg);
+          border-right: var(--card-border);
+        }
+        .dashboard-topnav {
+          display: none;
+        }
+        .dashboard-main {
+          flex: 1;
+          min-width: 0;
+          padding: 1rem;
+          padding-bottom: 6rem;
+          max-width: 1400px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        @media (max-width: 768px) {
+          .dashboard-layout {
+            flex-direction: column;
+          }
+          .dashboard-sidebar {
+            display: none;
+          }
+          .dashboard-topnav {
+            display: flex;
+            gap: 0.25rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--card-bg);
+            border-bottom: var(--card-border);
+            overflow-x: auto;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+          }
+        }
+      `}</style>
+
+      <div className="dashboard-layout">
+        {/* Sidebar – desktop */}
+        <nav className="dashboard-sidebar">
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--chart-text)", textTransform: "uppercase", letterSpacing: "0.05em", padding: "0.4rem 0.6rem", marginBottom: "0.25rem" }}>
+            Navigation
+          </div>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveTab(item.key)}
+              style={sideTabStyle(activeTab === item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Top nav – mobile */}
+        <nav className="dashboard-topnav">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveTab(item.key)}
+              style={mobileTabStyle(activeTab === item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Main content */}
+        <div className="dashboard-main">
+          {renderContent()}
+        </div>
+      </div>
     </>
   );
 }
@@ -316,5 +416,19 @@ function sideTabStyle(active: boolean): React.CSSProperties {
     background: active ? "var(--btn-bg)" : "transparent",
     color: active ? "var(--btn-color)" : "var(--foreground)",
     cursor: "pointer",
+  };
+}
+
+function mobileTabStyle(active: boolean): React.CSSProperties {
+  return {
+    border: "none",
+    borderRadius: 8,
+    padding: "0.4rem 0.75rem",
+    fontSize: "0.8rem",
+    fontWeight: active ? 600 : 500,
+    background: active ? "var(--btn-bg)" : "transparent",
+    color: active ? "var(--btn-color)" : "var(--foreground)",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   };
 }
