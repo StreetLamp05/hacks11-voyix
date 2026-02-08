@@ -193,102 +193,156 @@ export default function DashboardShell({
   };
 
   return (
-    <>
-      <div style={{ padding: "1rem", paddingBottom: "6rem", maxWidth: 1400, margin: "0 auto" }}>
-        {/* Header */}
-        <div
+    <div style={{ padding: "1rem 2rem 6rem 1rem", minHeight: "100vh" }}>
+      <div style={{ display: "flex", gap: "1rem" }}>
+        <aside    
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1.5rem",
+            width: 64,
+            flexShrink: 0,
+            alignSelf: "flex-start",
+            position: "sticky",
+            top: "1rem",
+            background: "var(--card-bg)",
+            border: "var(--card-border)",
+            borderRadius: "var(--card-radius)",
+            boxShadow: "var(--card-shadow)",
+            padding: "0.75rem",
           }}
         >
-          <div>
-            <h1 style={{ fontSize: "1.75rem", fontWeight: 700, margin: 0 }}>
-              {restaurantName}
-            </h1>
-            <p style={{ color: "var(--chart-text)", margin: "0.25rem 0 0", fontSize: "0.85rem" }}>
-              Dashboard
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            {/* Widget picker */}
-            <button
-              onClick={() => setIsPickerOpen(true)}
-              aria-label="Choose widgets"
-              title="Choose widgets"
-              style={iconBtnStyle}
-            >
-              <GridIcon />
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <button onClick={() => setActiveTab("dashboard")} style={sideTabStyle(activeTab === "dashboard")}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="11" width="4" height="10" rx="1" fill="currentColor"/>
+                <rect x="10" y="7" width="4" height="14" rx="1" fill="currentColor"/>
+                <rect x="17" y="3" width="4" height="18" rx="1" fill="currentColor"/>
+              </svg>
             </button>
-
-            {/* Drag mode toggle */}
-            <button
-              onClick={() => setIsDragMode((d) => !d)}
-              aria-label={isDragMode ? "Done rearranging" : "Rearrange widgets"}
-              title={isDragMode ? "Done rearranging" : "Rearrange widgets"}
-              style={{
-                ...iconBtnStyle,
-                background: isDragMode ? "var(--color-success)" : "var(--btn-bg)",
-              }}
-            >
-              <MoveIcon />
+            <button onClick={() => setActiveTab("inventory")} style={sideTabStyle(activeTab === "inventory")}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <path d="M9 9h6v6H9V9z" fill="currentColor"/>
+                <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
+                <path d="M9 3v18" stroke="currentColor" strokeWidth="2"/>
+              </svg>
             </button>
             <button onClick={() => setActiveTab("menu")} style={sideTabStyle(activeTab === "menu")}>
-              Menu
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
             </button>
             <button onClick={() => setActiveTab("calendar")} style={sideTabStyle(activeTab === "calendar")}>
-              Calendar
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
             </button>
           </div>
-        </div>
+        </aside>
 
-        {/* Grid */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
-        >
-          <SortableContext
-            items={visibleWidgetIds}
-            strategy={rectSortingStrategy}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1.25rem",
+            }}
           >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fill, minmax(max(160px, calc(20% - 1rem)), 1fr))",
-                gridAutoRows: 180,
-                gap: "1rem",
-              }}
-            >
-              {visibleWidgetIds.map((id) => (
-                <SortableWidget
-                  key={id}
-                  widgetId={id}
-                  restaurantId={restaurantId}
-                  isDragMode={isDragMode}
-                  isBeingDragged={id === activeId}
-                  isDropTarget={id === overId && overId !== activeId}
-                />
-              ))}
+            <div>
+              <h1 style={{ fontSize: "1.75rem", fontWeight: 700, margin: 0 }}>
+                {activeTab === "dashboard" ? "Dashboard" : 
+                 activeTab === "inventory" ? "Inventory" :
+                 activeTab === "menu" ? "Menu" : "Calendar"}
+              </h1>
+              <p style={{ color: "var(--chart-text)", margin: "0.25rem 0 0", fontSize: "0.85rem" }}>
+                {activeTab === "dashboard" ? "Drag and configure widgets for this restaurant" :
+                 activeTab === "inventory" ? "Browse inventory records with pagination" :
+                 activeTab === "menu" ? "Manage menu items and pricing" : "Schedule and events"}
+              </p>
             </div>
-          </SortableContext>
+            {activeTab === "dashboard" && (
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <button
+                  onClick={() => setIsPickerOpen(true)}
+                  aria-label="Choose widgets"
+                  title="Choose widgets"
+                  style={iconBtnStyle}
+                >
+                  <GridIcon />
+                </button>
+                <button
+                  onClick={() => setIsDragMode((d) => !d)}
+                  aria-label={isDragMode ? "Done rearranging" : "Rearrange widgets"}
+                  title={isDragMode ? "Done rearranging" : "Rearrange widgets"}
+                  style={{
+                    ...iconBtnStyle,
+                    background: isDragMode ? "var(--color-success)" : "var(--btn-bg)",
+                  }}
+                >
+                  <MoveIcon />
+                </button>
+              </div>
+            )}
+          </div>
 
-          <DragOverlay dropAnimation={null}>
-            {activeId ? (
-              <DragOverlayCard
-                widgetId={activeId}
-                restaurantId={restaurantId}
-              />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+          {activeTab === "dashboard" ? (
+            <>
+              {/* Grid */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                <SortableContext
+                  items={visibleWidgetIds}
+                  strategy={rectSortingStrategy}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(280px, 1fr))",
+                      gridAutoRows: "minmax(200px, auto)",
+                      gap: "1.5rem",
+                    }}
+                  >
+                    {visibleWidgetIds.map((id) => (
+                      <SortableWidget
+                        key={id}
+                        widgetId={id}
+                        restaurantId={restaurantId}
+                        isDragMode={isDragMode}
+                        isBeingDragged={id === activeId}
+                        isDropTarget={id === overId && overId !== activeId}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+
+                <DragOverlay dropAnimation={null}>
+                  {activeId ? (
+                    <DragOverlayCard
+                      widgetId={activeId}
+                      restaurantId={restaurantId}
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </>
+          ) : (
+            <div style={{ padding: "2rem", textAlign: "center", color: "var(--chart-text)" }}>
+              {activeTab === "inventory" && "Inventory management coming soon..."}
+              {activeTab === "menu" && "Menu management coming soon..."}
+              {activeTab === "calendar" && "Calendar feature coming soon..."}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Widget picker modal */}
@@ -300,7 +354,7 @@ export default function DashboardShell({
           onClose={() => setIsPickerOpen(false)}
         />
       )}
-    </>
+    </div>
   );
 }
 
