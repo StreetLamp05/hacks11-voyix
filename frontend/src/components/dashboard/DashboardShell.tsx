@@ -313,109 +313,186 @@ export default function DashboardShell({
   };
 
   return (
-    <>
-      <style>{`
-        .dashboard-layout {
-          display: flex;
-          min-height: 0;
-        }
-        .dashboard-sidebar {
-          position: sticky;
-          top: 0;
-          width: 200px;
-          min-width: 200px;
-          height: 100vh;
-          padding: 1rem 0.75rem;
-          display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
-          background: var(--card-bg);
-          border-right: var(--card-border);
-        }
-        .dashboard-topnav {
-          display: none;
-        }
-        .dashboard-main {
-          flex: 1;
-          min-width: 0;
-          padding: 1rem;
-          padding-bottom: 6rem;
-          max-width: 1400px;
-          margin: 0 auto;
-          width: 100%;
-        }
-        @media (max-width: 768px) {
-          .dashboard-layout {
-            flex-direction: column;
-          }
-          .dashboard-sidebar {
-            display: none;
-          }
-          .dashboard-topnav {
-            display: flex;
-            gap: 0.25rem;
-            padding: 0.5rem 0.75rem;
-            background: var(--card-bg);
-            border-bottom: var(--card-border);
-            overflow-x: auto;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-          }
-        }
-      `}</style>
-
-      <div className="dashboard-layout">
-        {/* Sidebar – desktop */}
-        <nav className="dashboard-sidebar">
-          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--chart-text)", textTransform: "uppercase", letterSpacing: "0.05em", padding: "0.4rem 0.6rem", marginBottom: "0.25rem" }}>
-            Navigation
+    <div style={{ padding: "1rem 2rem 6rem 1rem", minHeight: "100vh" }}>
+      <div style={{ display: "flex", gap: "1rem" }}>
+        <aside    
+          style={{
+            width: 64,
+            flexShrink: 0,
+            alignSelf: "flex-start",
+            position: "sticky",
+            top: "1rem",
+            background: "var(--card-bg)",
+            border: "var(--card-border)",
+            borderRadius: "var(--card-radius)",
+            boxShadow: "var(--card-shadow)",
+            padding: "0.75rem",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <button onClick={() => setActiveTab("dashboard")} style={sideTabStyle(activeTab === "dashboard")}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="11" width="4" height="10" rx="1" fill="currentColor"/>
+                <rect x="10" y="7" width="4" height="14" rx="1" fill="currentColor"/>
+                <rect x="17" y="3" width="4" height="18" rx="1" fill="currentColor"/>
+              </svg>
+            </button>
+            <button onClick={() => setActiveTab("inventory")} style={sideTabStyle(activeTab === "inventory")}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <path d="M9 9h6v6H9V9z" fill="currentColor"/>
+                <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
+                <path d="M9 3v18" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </button>
+            <button onClick={() => setActiveTab("menu")} style={sideTabStyle(activeTab === "menu")}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <button onClick={() => setActiveTab("calendar")} style={sideTabStyle(activeTab === "calendar")}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
           </div>
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setActiveTab(item.key)}
-              style={sideTabStyle(activeTab === item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+        </aside>
 
-        {/* Top nav – mobile */}
-        <nav className="dashboard-topnav">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setActiveTab(item.key)}
-              style={mobileTabStyle(activeTab === item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1.25rem",
+            }}
+          >
+            <div>
+              <h1 style={{ fontSize: "1.75rem", fontWeight: 700, margin: 0 }}>
+                {activeTab === "dashboard" ? "Dashboard" : 
+                 activeTab === "inventory" ? "Inventory" :
+                 activeTab === "menu" ? "Menu" : "Calendar"}
+              </h1>
+              <p style={{ color: "var(--chart-text)", margin: "0.25rem 0 0", fontSize: "0.85rem" }}>
+                {activeTab === "dashboard" ? "Drag and configure widgets for this restaurant" :
+                 activeTab === "inventory" ? "Browse inventory records with pagination" :
+                 activeTab === "menu" ? "Manage menu items and pricing" : "Schedule and events"}
+              </p>
+            </div>
+            {activeTab === "dashboard" && (
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <button
+                  onClick={() => setIsPickerOpen(true)}
+                  aria-label="Choose widgets"
+                  title="Choose widgets"
+                  style={iconBtnStyle}
+                >
+                  <GridIcon />
+                </button>
+                <button
+                  onClick={() => setIsDragMode((d) => !d)}
+                  aria-label={isDragMode ? "Done rearranging" : "Rearrange widgets"}
+                  title={isDragMode ? "Done rearranging" : "Rearrange widgets"}
+                  style={{
+                    ...iconBtnStyle,
+                    background: isDragMode ? "var(--color-success)" : "var(--btn-bg)",
+                  }}
+                >
+                  <MoveIcon />
+                </button>
+              </div>
+            )}
+          </div>
 
-        {/* Main content */}
-        <div className="dashboard-main">
-          {renderContent()}
+          {activeTab === "dashboard" ? (
+            <>
+              {/* Grid */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                <SortableContext
+                  items={visibleWidgetIds}
+                  strategy={rectSortingStrategy}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(280px, 1fr))",
+                      gridAutoRows: "minmax(200px, auto)",
+                      gap: "1.5rem",
+                    }}
+                  >
+                    {visibleWidgetIds.map((id) => (
+                      <SortableWidget
+                        key={id}
+                        widgetId={id}
+                        restaurantId={restaurantId}
+                        isDragMode={isDragMode}
+                        isBeingDragged={id === activeId}
+                        isDropTarget={id === overId && overId !== activeId}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+
+                <DragOverlay dropAnimation={null}>
+                  {activeId ? (
+                    <DragOverlayCard
+                      widgetId={activeId}
+                      restaurantId={restaurantId}
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </>
+          ) : (
+            <div style={{ padding: "2rem", textAlign: "center", color: "var(--chart-text)" }}>
+              {activeTab === "inventory" && "Inventory management coming soon..."}
+              {activeTab === "menu" && "Menu management coming soon..."}
+              {activeTab === "calendar" && "Calendar feature coming soon..."}
+            </div>
+          )}
         </div>
       </div>
-    </>
+
+      {/* Widget picker modal */}
+      {isPickerOpen && (
+        <WidgetPickerModal
+          visibleWidgetIds={visibleWidgetIds}
+          onToggle={toggleWidget}
+          onReset={resetLayout}
+          onClose={() => setIsPickerOpen(false)}
+        />
+      )}
+    </div>
   );
 }
 
 function sideTabStyle(active: boolean): React.CSSProperties {
   return {
     width: "100%",
-    textAlign: "left",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     border: "none",
     borderRadius: 8,
-    padding: "0.5rem 0.6rem",
+    padding: "0.5rem",
     fontSize: "0.85rem",
     fontWeight: active ? 600 : 500,
     background: active ? "var(--btn-bg)" : "transparent",
     color: active ? "var(--btn-color)" : "var(--foreground)",
     cursor: "pointer",
+    transition: "all 0.2s ease",
   };
 }
 
