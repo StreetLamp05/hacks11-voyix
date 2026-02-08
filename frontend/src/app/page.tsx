@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { apiUrl } from "@/lib/api";
 
 type HealthStatus = {
@@ -44,6 +45,12 @@ export default function Home() {
                   : "Connecting..."}
             </span>
         </div>
+        <Link
+          href="/query"
+          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Query Inventory
+        </Link>
       </div>
   );
 }

@@ -27,7 +27,12 @@ def create_app():
     app.json_provider_class = CustomJSONProvider
     app.json = CustomJSONProvider(app)
 
-    CORS(app)
+    CORS(app, origins=[
+        "http://localhost:3000",
+        "http://localhost:8501",
+        "https://foodix.streamlit.app",
+        "https://foodixapi.quentinlab.co",
+    ])
 
     if Config.AUTO_MIGRATE:
         from .db import run_migrations
@@ -41,6 +46,7 @@ def create_app():
     from .routes.dashboard import dashboard_bp
     from .routes.menu import menu_bp
     from .routes.batches import batches_bp
+    from .routes.nl2sql import nl2sql_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(restaurants_bp)
@@ -50,5 +56,6 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(menu_bp)
     app.register_blueprint(batches_bp)
+    app.register_blueprint(nl2sql_bp)
 
     return app

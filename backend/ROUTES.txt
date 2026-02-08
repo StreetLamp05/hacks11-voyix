@@ -1,0 +1,143 @@
+================================================================================
+  Backend API Routes
+================================================================================
+
+All routes return JSON. Base URL: http://localhost:5000
+
+================================================================================
+  HEALTH
+  Blueprint: health_bp          File: routes/health.py
+================================================================================
+
+GET  /api/health
+     Health check. Returns status, database connectivity, and timestamp.
+
+================================================================================
+  RESTAURANTS
+  Blueprint: restaurants_bp     File: routes/restaurants.py
+================================================================================
+
+GET  /api/restaurants
+     List all restaurants.
+
+GET  /api/restaurants/:restaurant_id
+     Get a single restaurant by ID.
+
+================================================================================
+  INGREDIENTS
+  Blueprint: ingredients_bp     File: routes/ingredients.py
+================================================================================
+
+GET  /api/ingredients
+     Full ingredient catalog (master list, not restaurant-specific).
+
+GET  /api/restaurants/:restaurant_id/ingredients
+     List ingredients tracked by a specific restaurant.
+
+GET  /api/restaurants/:restaurant_id/ingredients/:ingredient_id
+     Get a single ingredient for a restaurant.
+
+POST /api/restaurants/:restaurant_id/ingredients
+     Add an ingredient to a restaurant.
+     Body: { ingredient_id, lead_time_days?, safety_stock_days? }
+
+DELETE /api/restaurants/:restaurant_id/ingredients/:ingredient_id
+     Remove an ingredient from a restaurant.
+
+================================================================================
+  INVENTORY
+  Blueprint: inventory_bp       File: routes/inventory.py
+================================================================================
+
+GET  /api/restaurants/:restaurant_id/inventory
+     Current inventory levels for all ingredients at a restaurant.
+
+GET  /api/restaurants/:restaurant_id/inventory/:ingredient_id/history
+     Historical inventory for a specific ingredient.
+     Query: ?days=30
+
+POST /api/restaurants/:restaurant_id/inventory/:ingredient_id/usage
+     Log usage for an ingredient. Also performs FIFO batch deduction.
+     Body: { qty_used }
+
+POST /api/restaurants/:restaurant_id/inventory/:ingredient_id/restock
+     Log a restock for an ingredient.
+     Body: { restock_qty }
+
+================================================================================
+  PREDICTIONS
+  Blueprint: predictions_bp     File: routes/predictions.py
+================================================================================
+
+GET  /api/restaurants/:restaurant_id/predictions
+     All ML demand predictions for a restaurant.
+
+GET  /api/restaurants/:restaurant_id/predictions/:ingredient_id
+     Prediction for a single ingredient.
+
+================================================================================
+  DASHBOARD
+  Blueprint: dashboard_bp       File: routes/dashboard.py
+================================================================================
+
+GET  /api/restaurants/:restaurant_id/dashboard/overview
+     Summary stats: total ingredients, stockout count, low stock, averages.
+
+GET  /api/restaurants/:restaurant_id/dashboard/trends
+     Aggregated daily trends for charts.
+     Query: ?days=30
+
+GET  /api/restaurants/:restaurant_id/dashboard/top-movers
+     Highest-usage ingredients over the last 7 days.
+     Query: ?limit=10
+
+================================================================================
+  MENU
+  Blueprint: menu_bp            File: routes/menu.py
+================================================================================
+
+GET  /api/restaurants/:restaurant_id/menu
+     List all menu items for a restaurant.
+
+GET  /api/menu-items/:menu_item_id
+     Menu item detail with full ingredient BOM (bill of materials).
+
+================================================================================
+  BATCHES
+  Blueprint: batches_bp         File: routes/batches.py
+================================================================================
+
+GET  /api/restaurants/:restaurant_id/batches
+     All batches for a restaurant (across all ingredients).
+     Query: ?active_only=true
+
+GET  /api/restaurants/:restaurant_id/ingredients/:ingredient_id/batches
+     Batches for a specific ingredient at a restaurant.
+     Query: ?status=active
+
+GET  /api/batches/:batch_id
+     Get a single batch by ID.
+
+POST /api/restaurants/:restaurant_id/ingredients/:ingredient_id/batches
+     Record a new batch received.
+     Body: { qty_received, supplier_name?, supplier_contact?,
+             purchase_cost_per_unit?, received_date?, expiration_date? }
+
+GET  /api/restaurants/:restaurant_id/batches/expiring-soon
+     Batches expiring within N days.
+     Query: ?days=3
+
+================================================================================
+  NL2SQL (Natural Language to SQL)
+  Blueprint: nl2sql_bp          File: routes/nl2sql.py
+================================================================================
+
+POST /api/nl2sql
+     Ask a natural language question about inventory data.
+     Body: { question }
+     Success 200: { question, sql, results, row_count }
+     Error   422: { question, sql, error }
+
+================================================================================
+  TOTALS:  9 blueprints  |  22 endpoints
+================================================================================
