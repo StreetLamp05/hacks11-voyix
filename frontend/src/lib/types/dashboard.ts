@@ -117,6 +117,8 @@ export interface InventoryHistory {
 
 // --- Widget layout types ---
 
+export type WidgetSize = "2x1" | "2x2" | "2x3" | "1x2" | "1x3";
+
 export type WidgetId =
   | "stock-forecast"
   | "overview-stats"
@@ -133,7 +135,7 @@ export interface WidgetConfig {
   id: WidgetId;
   label: string;
   description: string;
-  defaultColSpan: 1 | 2;
+  defaultSize: WidgetSize;
 }
 
 export interface LayoutState {

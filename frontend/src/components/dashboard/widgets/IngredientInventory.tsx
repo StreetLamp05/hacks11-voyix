@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -205,11 +205,14 @@ function ForecastDetail({
 
 // --- main widget ---
 
+type SortBy = "risk-desc" | "qty-asc" | "qty-desc" | "name-asc";
+
 export default function IngredientInventory({ restaurantId }: WidgetProps) {
   const [inventory, setInventory] = useState<InventoryItem[] | null>(null);
   const [predictions, setPredictions] = useState<PredictionsResponse | null>(null);
   const [error, setError] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("risk-desc");
 
   useEffect(() => {
     Promise.all([fetchInventory(restaurantId), fetchPredictions(restaurantId)])
@@ -224,29 +227,80 @@ export default function IngredientInventory({ restaurantId }: WidgetProps) {
     setSelectedId((prev) => (prev === ingredientId ? null : ingredientId));
   }, []);
 
-  if (error) return <p style={{ color: "var(--color-danger)" }}>Failed to load inventory data</p>;
-  if (!inventory) return <Skeleton />;
-  if (inventory.length === 0) return <p style={{ color: "var(--chart-text)" }}>No inventory data</p>;
+  const predMap = useMemo(() => {
+    const map = new Map<number, Prediction>();
+    if (predictions) {
+      for (const p of predictions.all) map.set(p.ingredient_id, p);
+    }
+    return map;
+  }, [predictions]);
 
-  const predMap = new Map<number, Prediction>();
-  if (predictions) {
-    for (const p of predictions.all) predMap.set(p.ingredient_id, p);
-  }
+  const sortedInventory = useMemo(() => {
+    if (!inventory) return [];
+    const data = [...inventory];
 
-  const chartData = inventory.map((d) => ({
+    const riskScore = (item: InventoryItem) => {
+      if (item.inventory_end <= 0) return -9999;
+      const pred = predMap.get(item.ingredient_id);
+      if (pred?.days_until_stockout !== null && pred?.days_until_stockout !== undefined) {
+        return pred.days_until_stockout;
+      }
+      if (item.avg_daily_usage_7d > 0) return item.inventory_end / item.avg_daily_usage_7d;
+      return 9999;
+    };
+
+    data.sort((a, b) => {
+      if (sortBy === "name-asc") return a.ingredient_name.localeCompare(b.ingredient_name);
+      if (sortBy === "qty-asc") return a.inventory_end - b.inventory_end;
+      if (sortBy === "qty-desc") return b.inventory_end - a.inventory_end;
+      return riskScore(a) - riskScore(b);
+    });
+
+    return data;
+  }, [inventory, predMap, sortBy]);
+
+  const chartData = sortedInventory.map((d) => ({
     id: d.ingredient_id,
     name: d.ingredient_name.length > 18 ? d.ingredient_name.slice(0, 17) + "\u2026" : d.ingredient_name,
     qty: d.inventory_end,
     _item: d,
   }));
 
-  const selectedItem = selectedId !== null ? inventory.find((i) => i.ingredient_id === selectedId) : null;
+  const selectedItem = selectedId !== null && inventory
+    ? inventory.find((i) => i.ingredient_id === selectedId)
+    : null;
+
+  if (error) return <p style={{ color: "var(--color-danger)" }}>Failed to load inventory data</p>;
+  if (!inventory) return <Skeleton />;
+  if (inventory.length === 0) return <p style={{ color: "var(--chart-text)" }}>No inventory data</p>;
 
   return (
     <div>
-      <p style={{ fontSize: "0.8rem", color: "var(--chart-text)", margin: "0 0 0.5rem" }}>
-        Click an ingredient to view its forecast
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 0 0.5rem" }}>
+        <p style={{ fontSize: "0.8rem", color: "var(--chart-text)", margin: 0 }}>
+          Click an ingredient to view its forecast
+        </p>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8rem", color: "var(--chart-text)" }}>
+          Sort by
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            style={{
+              fontSize: "0.8rem",
+              background: "var(--background)",
+              color: "var(--chart-text)",
+              border: "var(--card-border)",
+              borderRadius: 4,
+              padding: "0.15rem 0.3rem",
+            }}
+          >
+            <option value="risk-desc">Risk (highest first)</option>
+            <option value="qty-asc">Quantity (low to high)</option>
+            <option value="qty-desc">Quantity (high to low)</option>
+            <option value="name-asc">Name (A-Z)</option>
+          </select>
+        </label>
+      </div>
 
       <ResponsiveContainer width="100%" height={Math.max(220, chartData.length * 30)}>
         <BarChart
