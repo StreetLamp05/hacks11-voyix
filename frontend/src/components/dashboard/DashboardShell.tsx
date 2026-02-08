@@ -30,7 +30,7 @@ interface DashboardShellProps {
   restaurantName: string;
 }
 
-type DashboardTab = "dashboard" | "inventory";
+type DashboardTab = "dashboard" | "inventory" | "menu" | "calendar";
 
 function sizeToSpans(size: WidgetSize): { colSpan: number; rowSpan: number } {
   const [c, r] = size.split("x").map(Number);
@@ -235,6 +235,12 @@ export default function DashboardShell({
               }}
             >
               <MoveIcon />
+            </button>
+            <button onClick={() => setActiveTab("menu")} style={sideTabStyle(activeTab === "menu")}>
+              Menu
+            </button>
+            <button onClick={() => setActiveTab("calendar")} style={sideTabStyle(activeTab === "calendar")}>
+              Calendar
             </button>
           </div>
         </div>
