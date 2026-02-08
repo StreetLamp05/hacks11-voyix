@@ -62,7 +62,12 @@ export default function WidgetPicker({
               style={{ marginTop: "0.2rem" }}
             />
             <div>
-              <div style={{ fontWeight: 500 }}>{w.label}</div>
+              <div style={{ fontWeight: 500 }}>
+                {w.label}{" "}
+                <span style={{ fontWeight: 400, color: "var(--chart-text)", fontSize: "0.75rem" }}>
+                  ({w.defaultSize})
+                </span>
+              </div>
               <div style={{ fontSize: "0.75rem", color: "var(--chart-text)" }}>
                 {w.description}
               </div>

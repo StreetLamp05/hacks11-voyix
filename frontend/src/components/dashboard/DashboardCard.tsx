@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 interface DashboardCardProps {
   title: string;
   children: ReactNode;
-  colSpan?: 1 | 2;
   isEditing?: boolean;
   dragHandleSlot?: ReactNode;
 }
@@ -28,6 +27,10 @@ export default function DashboardCard({
           : "var(--card-border)",
         padding: "var(--card-padding)",
         boxShadow: "var(--card-shadow)",
+        height: "100%",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <div
@@ -36,6 +39,7 @@ export default function DashboardCard({
           alignItems: "center",
           justifyContent: "space-between",
           marginBottom: "0.75rem",
+          flexShrink: 0,
         }}
       >
         <h3
@@ -50,7 +54,9 @@ export default function DashboardCard({
         </h3>
         {dragHandleSlot}
       </div>
-      {children}
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        {children}
+      </div>
     </div>
   );
 }
