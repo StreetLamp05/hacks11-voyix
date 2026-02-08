@@ -24,13 +24,15 @@ import DashboardCard from "./DashboardCard";
 import DragHandle from "./DragHandle";
 import WidgetPicker from "./WidgetPicker";
 import InventoryTableView from "./InventoryTableView";
+import MenuTableView from "./MenuTableView";
+import TrafficCalendarView from "./TrafficCalendarView";
 
 interface DashboardShellProps {
   restaurantId: number;
   restaurantName: string;
 }
 
-type DashboardTab = "dashboard" | "inventory";
+type DashboardTab = "dashboard" | "inventory" | "menu" | "calendar";
 
 function sizeToSpans(size: WidgetSize): { colSpan: number; rowSpan: number } {
   const [c, r] = size.split("x").map(Number);
@@ -101,7 +103,7 @@ export default function DashboardShell({
   } = useDashboardLayout(restaurantId);
 
   useEffect(() => {
-    if (activeTab === "inventory" && isEditing) setIsEditing(false);
+    if (activeTab !== "dashboard" && isEditing) setIsEditing(false);
   }, [activeTab, isEditing, setIsEditing]);
 
   const sensors = useSensors(
@@ -156,6 +158,12 @@ export default function DashboardShell({
             <button onClick={() => setActiveTab("inventory")} style={sideTabStyle(activeTab === "inventory")}>
               Inventory
             </button>
+            <button onClick={() => setActiveTab("menu")} style={sideTabStyle(activeTab === "menu")}>
+              Menu
+            </button>
+            <button onClick={() => setActiveTab("calendar")} style={sideTabStyle(activeTab === "calendar")}>
+              Calendar
+            </button>
           </div>
         </aside>
 
@@ -171,12 +179,22 @@ export default function DashboardShell({
           >
             <div>
               <h1 style={{ fontSize: "1.75rem", fontWeight: 700, margin: 0 }}>
-                {activeTab === "dashboard" ? "Dashboard" : "Inventory"}
+                {activeTab === "dashboard"
+                  ? "Dashboard"
+                  : activeTab === "inventory"
+                    ? "Inventory"
+                    : activeTab === "menu"
+                      ? "Menu"
+                      : "Traffic Calendar"}
               </h1>
               <p style={{ color: "var(--chart-text)", margin: "0.25rem 0 0", fontSize: "0.85rem" }}>
                 {activeTab === "dashboard"
                   ? "Drag and configure widgets for this restaurant"
-                  : "Browse inventory records with pagination"}
+                  : activeTab === "inventory"
+                    ? "Browse inventory records with pagination"
+                    : activeTab === "menu"
+                      ? "Browse menu items and open ingredient BOM details"
+                      : "Predicted heavy-traffic days and holidays by month"}
               </p>
             </div>
             {activeTab === "dashboard" && (
@@ -200,6 +218,10 @@ export default function DashboardShell({
 
           {activeTab === "inventory" ? (
             <InventoryTableView key={restaurantId} restaurantId={restaurantId} />
+          ) : activeTab === "menu" ? (
+            <MenuTableView key={restaurantId} restaurantId={restaurantId} />
+          ) : activeTab === "calendar" ? (
+            <TrafficCalendarView key={restaurantId} restaurantId={restaurantId} />
           ) : (
             <div style={{ display: "flex", gap: "1.5rem" }}>
               {/* Widget picker sidebar (edit mode only) */}
