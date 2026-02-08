@@ -18,7 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useDashboardLayout } from "@/lib/hooks/useDashboardLayout";
 import { WIDGET_MAP } from "@/lib/constants/widget-registry";
-import type { WidgetId } from "@/lib/types/dashboard";
+import type { WidgetId, WidgetSize } from "@/lib/types/dashboard";
 import DashboardCard from "./DashboardCard";
 import DragHandle from "./DragHandle";
 import WidgetPicker from "./WidgetPicker";
@@ -26,6 +26,11 @@ import WidgetPicker from "./WidgetPicker";
 interface DashboardShellProps {
   restaurantId: number;
   restaurantName: string;
+}
+
+function sizeToSpans(size: WidgetSize): { colSpan: number; rowSpan: number } {
+  const [c, r] = size.split("x").map(Number);
+  return { colSpan: c, rowSpan: r };
 }
 
 function SortableWidget({
@@ -50,11 +55,13 @@ function SortableWidget({
   if (!entry) return null;
 
   const Widget = entry.component;
+  const { colSpan, rowSpan } = sizeToSpans(entry.defaultSize);
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    gridColumn: `span ${entry.defaultColSpan}`,
+    gridColumn: `span ${colSpan}`,
+    gridRow: `span ${rowSpan}`,
     opacity: isDragging ? 0.5 : 1,
   };
 
@@ -62,7 +69,6 @@ function SortableWidget({
     <div ref={setNodeRef} style={style}>
       <DashboardCard
         title={entry.label}
-        colSpan={entry.defaultColSpan}
         isEditing={isEditing}
         dragHandleSlot={
           isEditing ? (
@@ -111,7 +117,7 @@ export default function DashboardShell({
   }
 
   return (
-    <div style={{ padding: "1.5rem", maxWidth: 1200, margin: "0 auto" }}>
+    <div style={{ padding: "1rem", paddingBottom: "6rem", maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
       <div
         style={{
@@ -171,8 +177,10 @@ export default function DashboardShell({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: "1.25rem",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(max(160px, calc(20% - 1rem)), 1fr))",
+                  gridAutoRows: 180,
+                  gap: "1rem",
                 }}
               >
                 {visibleWidgetIds.map((id) => (
