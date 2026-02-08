@@ -307,14 +307,17 @@ export default function DashboardShell({
 function sideTabStyle(active: boolean): React.CSSProperties {
   return {
     width: "100%",
-    textAlign: "left",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     border: "none",
     borderRadius: 8,
-    padding: "0.5rem 0.6rem",
+    padding: "0.5rem",
     fontSize: "0.85rem",
     fontWeight: active ? 600 : 500,
     background: active ? "var(--btn-bg)" : "transparent",
     color: active ? "var(--btn-color)" : "var(--foreground)",
     cursor: "pointer",
+    transition: "all 0.2s ease",
   };
 }
