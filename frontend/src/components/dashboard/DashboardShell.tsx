@@ -3,11 +3,14 @@
 import { useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
+  type DragStartEvent,
+  type DragOverEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
@@ -16,18 +19,11 @@ import {
   rectSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { useDashboardLayout } from "@/lib/hooks/useDashboardLayout";
 import { WIDGET_MAP } from "@/lib/constants/widget-registry";
 import type { WidgetId, WidgetSize } from "@/lib/types/dashboard";
 import DashboardCard from "./DashboardCard";
 import WidgetPickerModal from "./WidgetPickerModal";
-
-/* ── wiggle keyframes (injected once) ── */
-const WIGGLE_CSS = `@keyframes widgetWiggle {
-  0%   { transform: rotate(-0.5deg); }
-  100% { transform: rotate(0.5deg); }
-}`;
 
 interface DashboardShellProps {
   restaurantId: number;
@@ -43,19 +39,20 @@ function SortableWidget({
   widgetId,
   restaurantId,
   isDragMode,
+  isBeingDragged,
+  isDropTarget,
 }: {
   widgetId: WidgetId;
   restaurantId: number;
   isDragMode: boolean;
+  isBeingDragged: boolean;
+  isDropTarget: boolean;
 }) {
   const entry = WIDGET_MAP.get(widgetId);
   const {
     attributes,
     listeners,
     setNodeRef,
-    transform,
-    transition,
-    isDragging,
   } = useSortable({ id: widgetId, disabled: !isDragMode });
 
   if (!entry) return null;
@@ -64,11 +61,8 @@ function SortableWidget({
   const { colSpan, rowSpan } = sizeToSpans(entry.defaultSize);
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
     gridColumn: `span ${colSpan}`,
     gridRow: `span ${rowSpan}`,
-    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
@@ -77,10 +71,35 @@ function SortableWidget({
       style={style}
       {...(isDragMode ? { ...attributes, ...listeners } : {})}
     >
-      <DashboardCard title={entry.label} isDragMode={isDragMode}>
+      <DashboardCard
+        title={entry.label}
+        isDragMode={isDragMode}
+        isBeingDragged={isBeingDragged}
+        isDropTarget={isDropTarget}
+      >
         <Widget restaurantId={restaurantId} />
       </DashboardCard>
     </div>
+  );
+}
+
+/* ── Overlay card shown while dragging ── */
+
+function DragOverlayCard({
+  widgetId,
+  restaurantId,
+}: {
+  widgetId: WidgetId;
+  restaurantId: number;
+}) {
+  const entry = WIDGET_MAP.get(widgetId);
+  if (!entry) return null;
+  const Widget = entry.component;
+
+  return (
+    <DashboardCard title={entry.label}>
+      <Widget restaurantId={restaurantId} />
+    </DashboardCard>
   );
 }
 
@@ -118,6 +137,8 @@ export default function DashboardShell({
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isDragMode, setIsDragMode] = useState(false);
+  const [activeId, setActiveId] = useState<WidgetId | null>(null);
+  const [overId, setOverId] = useState<WidgetId | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -126,8 +147,19 @@ export default function DashboardShell({
     })
   );
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as WidgetId);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    setOverId((event.over?.id as WidgetId) ?? null);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    setActiveId(null);
+    setOverId(null);
+
     if (!over || active.id === over.id) return;
 
     const oldIdx = visibleWidgetIds.indexOf(active.id as WidgetId);
@@ -138,6 +170,11 @@ export default function DashboardShell({
     updated.splice(oldIdx, 1);
     updated.splice(newIdx, 0, active.id as WidgetId);
     reorderWidgets(updated);
+  }
+
+  function handleDragCancel() {
+    setActiveId(null);
+    setOverId(null);
   }
 
   const iconBtnStyle: React.CSSProperties = {
@@ -154,9 +191,6 @@ export default function DashboardShell({
 
   return (
     <>
-      {/* Inject wiggle animation */}
-      <style>{WIGGLE_CSS}</style>
-
       <div style={{ padding: "1rem", paddingBottom: "6rem", maxWidth: 1400, margin: "0 auto" }}>
         {/* Header */}
         <div
@@ -206,7 +240,10 @@ export default function DashboardShell({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <SortableContext
             items={visibleWidgetIds}
@@ -227,10 +264,21 @@ export default function DashboardShell({
                   widgetId={id}
                   restaurantId={restaurantId}
                   isDragMode={isDragMode}
+                  isBeingDragged={id === activeId}
+                  isDropTarget={id === overId && overId !== activeId}
                 />
               ))}
             </div>
           </SortableContext>
+
+          <DragOverlay dropAnimation={null}>
+            {activeId ? (
+              <DragOverlayCard
+                widgetId={activeId}
+                restaurantId={restaurantId}
+              />
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </div>
 

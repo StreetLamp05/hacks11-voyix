@@ -6,28 +6,37 @@ interface DashboardCardProps {
   title: string;
   children: ReactNode;
   isDragMode?: boolean;
+  isBeingDragged?: boolean;
+  isDropTarget?: boolean;
 }
 
 export default function DashboardCard({
   title,
   children,
   isDragMode = false,
+  isBeingDragged = false,
+  isDropTarget = false,
 }: DashboardCardProps) {
   return (
     <div
       style={{
         background: "var(--card-bg)",
         borderRadius: "var(--card-radius)",
-        border: "var(--card-border)",
+        border: isDropTarget
+          ? "2px dashed var(--color-success)"
+          : "var(--card-border)",
         padding: "var(--card-padding)",
-        boxShadow: "var(--card-shadow)",
+        boxShadow: isDropTarget
+          ? "0 0 0 4px rgba(52, 199, 89, 0.15)"
+          : "var(--card-shadow)",
         height: "100%",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         position: "relative",
         cursor: isDragMode ? "grab" : undefined,
-        animation: isDragMode ? "widgetWiggle 0.3s ease-in-out infinite alternate" : undefined,
+        opacity: isBeingDragged ? 0.3 : isDragMode ? 0.6 : 1,
+        transition: "opacity 150ms, border 150ms, box-shadow 150ms",
       }}
     >
       <div
@@ -61,7 +70,6 @@ export default function DashboardCard({
             position: "absolute",
             inset: 0,
             borderRadius: "var(--card-radius)",
-            background: "rgba(128, 128, 128, 0.08)",
           }}
         />
       )}
