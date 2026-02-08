@@ -5,32 +5,29 @@ import type { ReactNode } from "react";
 interface DashboardCardProps {
   title: string;
   children: ReactNode;
-  isEditing?: boolean;
-  dragHandleSlot?: ReactNode;
+  isDragMode?: boolean;
 }
 
 export default function DashboardCard({
   title,
   children,
-  isEditing = false,
-  dragHandleSlot,
+  isDragMode = false,
 }: DashboardCardProps) {
   return (
     <div
       style={{
-        background: isEditing
-          ? "var(--card-edit-bg)"
-          : "var(--card-bg)",
+        background: "var(--card-bg)",
         borderRadius: "var(--card-radius)",
-        border: isEditing
-          ? "var(--card-edit-border)"
-          : "var(--card-border)",
+        border: "var(--card-border)",
         padding: "var(--card-padding)",
         boxShadow: "var(--card-shadow)",
         height: "100%",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        position: "relative",
+        cursor: isDragMode ? "grab" : undefined,
+        animation: isDragMode ? "widgetWiggle 0.3s ease-in-out infinite alternate" : undefined,
       }}
     >
       <div
@@ -52,11 +49,22 @@ export default function DashboardCard({
         >
           {title}
         </h3>
-        {dragHandleSlot}
       </div>
-      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+      <div style={{ flex: 1, overflowY: isDragMode ? "hidden" : "auto", minHeight: 0 }}>
         {children}
       </div>
+
+      {/* Drag-mode overlay blocks all interaction with widget content */}
+      {isDragMode && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "var(--card-radius)",
+            background: "rgba(128, 128, 128, 0.08)",
+          }}
+        />
+      )}
     </div>
   );
 }
